@@ -120,14 +120,25 @@ class InertiaInitCommand extends HyperfCommand
 
     private function makeStructure(): void
     {
-        if(!$this->filesystem->exists(self::getInertiaPath())) {
+        if (!$this->filesystem->exists(self::getInertiaPath())) {
             $this->filesystem->makeDirectory(path: self::getInertiaPath(), recursive: true);
         }
 
-        $this->filesystem->makeDirectory(path: self::getInertiaPath() . '/js/Components', recursive: true);
-        $this->filesystem->makeDirectory(path: self::getInertiaPath() . '/js/Pages', recursive: true);
-        $this->filesystem->makeDirectory(path: self::getInertiaPath() . '/js/Layouts', recursive: true);
-        $this->filesystem->makeDirectory(path: self::getInertiaPath() . '/css', recursive: true);
+        if (!$this->filesystem->exists(self::getInertiaPath() . '/js/Components')) {
+            $this->filesystem->makeDirectory(path: self::getInertiaPath() . '/js/Components', recursive: true);
+        }
+
+        if (!$this->filesystem->exists(self::getInertiaPath() . '/js/Pages')) {
+            $this->filesystem->makeDirectory(path: self::getInertiaPath() . '/js/Pages', recursive: true);
+        }
+
+        if (!$this->filesystem->exists(self::getInertiaPath() . '/js/Layouts')) {
+            $this->filesystem->makeDirectory(path: self::getInertiaPath() . '/js/Layouts', recursive: true);
+        }
+
+        if (!$this->filesystem->exists(self::getInertiaPath() . '/css')) {
+            $this->filesystem->makeDirectory(path: self::getInertiaPath() . '/css', recursive: true);
+        }
     }
 
     private function getResources(StackEnum $stack): array
@@ -183,7 +194,7 @@ class InertiaInitCommand extends HyperfCommand
     private function copyResource(string $path, string $target, string $fileName): void
     {
         if (! $this->filesystem->exists($target)) {
-            $this->filesystem->makeDirectory($target);
+            $this->filesystem->makeDirectory($target, 0755, true);
         }
 
         if ($this->filesystem->copy($path . $fileName, $target . $fileName)) {
