@@ -1,5 +1,9 @@
 # Inertia.js Hyperf Adapter
 
+> 🍴 **Este repositório é um fork de [onix-systems-php/hyperf-inertia](https://github.com/onix-systems-php/hyperf-inertia)**,
+> modernizado para **Hyperf 3.2 / PHP 8.2+** com correções de bugs, suporte ao Vite 6,
+> macros de teste funcionais (`assertInertia`), testes e documentação completa.
+
 The Hyperf adapter for [Inertia.js](https://inertiajs.com/), letting you build
 single-page applications using classic server-side routing and controllers.
 
