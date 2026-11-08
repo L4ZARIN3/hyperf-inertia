@@ -1,4 +1,12 @@
 /tests export-ignore
 /.github export-ignore
-*.php       eol=lf
-*.sh        eol=lf
+/example export-ignore
+/publish export-ignore
+/.php-cs-fixer.php export-ignore
+/phpunit.xml export-ignore
+/phpstan.neon.dist export-ignore
+/phpstan-bootstrap.php export-ignore
+/.gitignore export-ignore
+*.php eol=lf
+*.sh eol=lf
+*.md eol=lf

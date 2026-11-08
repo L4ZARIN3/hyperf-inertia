@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace OnixSystemsPHP\HyperfInertia;
 
 use Hyperf\Context\Context;
+use Hyperf\HttpServer\Router\Dispatched;
 use Psr\Http\Message\ServerRequestInterface;
 
 class Controller
@@ -18,9 +19,14 @@ class Controller
     {
         /** @var Inertia $inertia */
         $inertia = Context::get(Inertia::class, new Inertia());
+
+        /** @var null|Dispatched $dispatched */
+        $dispatched = $request->getAttribute(Dispatched::class);
+        $defaults = $dispatched?->handler?->options['defaults'] ?? [];
+
         return $inertia->render(
-            $request->route()->defaults['component'],
-            $request->route()->defaults['props']
+            (string) ($defaults['component'] ?? ''),
+            (array) ($defaults['props'] ?? [])
         );
     }
 }

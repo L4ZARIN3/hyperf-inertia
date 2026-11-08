@@ -12,7 +12,6 @@ namespace OnixSystemsPHP\HyperfInertia\Testing;
 use Hyperf\Contract\Arrayable;
 use Hyperf\Macroable\Macroable;
 use PHPUnit\Framework\Assert as PHPUnit;
-use PHPUnit\Framework\AssertionFailedError;
 
 class Assert implements Arrayable
 {
@@ -56,16 +55,18 @@ class Assert implements Arrayable
 
     public static function fromTestResponse($response): self
     {
-        try {
-            $response->assertViewHas('page');
-            $page = json_decode(json_encode($response->viewData('page')), true);
+        $content = $response->getContent();
 
-            PHPUnit::assertIsArray($page);
-            PHPUnit::assertArrayHasKey('component', $page);
-            PHPUnit::assertArrayHasKey('props', $page);
-            PHPUnit::assertArrayHasKey('url', $page);
-            PHPUnit::assertArrayHasKey('version', $page);
-        } catch (AssertionFailedError $e) {
+        $page = json_decode($content, true);
+        if (! is_array($page) || ! isset($page['component'], $page['props'])) {
+            $page = null;
+
+            if (preg_match('/data-page="([^"]*)"/', $content, $matches) === 1) {
+                $page = json_decode(html_entity_decode($matches[1], ENT_QUOTES), true);
+            }
+        }
+
+        if (! is_array($page) || ! isset($page['component'], $page['props'])) {
             PHPUnit::fail('Not a valid Inertia response.');
         }
 

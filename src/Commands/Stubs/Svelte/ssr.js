@@ -1,7 +1,7 @@
 import createServer from "@inertiajs/svelte/server";
 import { createInertiaApp } from "@inertiajs/svelte";
 
-const appName = import.meta.env.VITE_APP_NAME || "Laravel";
+const appName = import.meta.env.VITE_APP_NAME || "Hyperf";
 createServer((page) =>
   createInertiaApp({
     page,

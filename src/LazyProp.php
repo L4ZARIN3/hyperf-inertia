@@ -13,14 +13,15 @@ use function Hyperf\Support\call;
 
 class LazyProp
 {
-    protected $callback;
+    /** @var callable */
+    private $callback;
 
     public function __construct(callable $callback)
     {
         $this->callback = $callback;
     }
 
-    public function __invoke()
+    public function __invoke(): mixed
     {
         return call($this->callback);
     }

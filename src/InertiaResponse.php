@@ -17,10 +17,8 @@ use Hyperf\Macroable\Macroable;
 use Hyperf\Resource\Json\JsonResource;
 use Hyperf\Resource\Response\Response;
 use Hyperf\View\RenderInterface;
-use Hyperf\ViewEngine\Contract\ViewInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Symfony\Component\HttpFoundation\JsonResponse;
 
 use function Hyperf\Support\call;
 
@@ -28,20 +26,22 @@ class InertiaResponse
 {
     use Macroable;
 
-    protected array $props;
+    /** @var array<string, mixed> */
+    public array $props;
 
+    /** @var array<string, mixed> */
     protected array $viewData = [];
 
     public function __construct(
-        protected string $component,
+        public string $component,
         array|Arrayable $props,
-        protected string $rootView = 'app',
-        protected string $version = ''
+        public string $rootView = 'app',
+        public string $version = ''
     ) {
         $this->props = $props instanceof Arrayable ? $props->toArray() : $props;
     }
 
-    public function with(array|string $key, mixed $value = null): self
+    public function with(array|string $key, mixed $value = null): static
     {
         if (is_array($key)) {
             $this->props = array_merge($this->props, $key);
@@ -52,7 +52,7 @@ class InertiaResponse
         return $this;
     }
 
-    public function withViewData(array|string $key, mixed $value = null): self
+    public function withViewData(array|string $key, mixed $value = null): static
     {
         if (is_array($key)) {
             $this->viewData = array_merge($this->viewData, $key);
@@ -63,7 +63,7 @@ class InertiaResponse
         return $this;
     }
 
-    public function rootView(string $rootView): self
+    public function rootView(string $rootView): static
     {
         $this->rootView = $rootView;
 
@@ -73,15 +73,13 @@ class InertiaResponse
     /**
      * Create an HTTP response that represents the object.
      */
-    public function toResponse(ServerRequestInterface $request): JsonResponse|ResponseInterface|ViewInterface
+    public function toResponse(ServerRequestInterface $request): ResponseInterface
     {
         $only = array_filter(explode(',', $request->getHeaderLine('X-Inertia-Partial-Data')));
 
         $props = ($only && $request->getHeaderLine('X-Inertia-Partial-Component') === $this->component)
             ? Arr::only($this->props, $only)
-            : array_filter($this->props, static function ($prop) {
-                return ! $prop instanceof LazyProp;
-            });
+            : array_filter($this->props, static fn ($prop) => ! $prop instanceof LazyProp);
 
         $props = $this->resolvePropertyInstances($props, $request);
 
@@ -91,6 +89,7 @@ class InertiaResponse
             'url' => $request->url(),
             'version' => $this->version,
         ];
+
         if ($request->hasHeader('X-Inertia')) {
             return (new Response(JsonResource::make($page)->withoutWrapping()))
                 ->toResponse()
@@ -104,6 +103,9 @@ class InertiaResponse
 
     /**
      * Resolve all necessary class instances in the given props.
+     *
+     * @param array<string, mixed> $props
+     * @return array<string, mixed>
      */
     public function resolvePropertyInstances(
         array $props,
@@ -124,7 +126,7 @@ class InertiaResponse
             }
 
             if ($value instanceof JsonResource) {
-                $value = $value->toResponse()->getBody()->getContents();
+                $value = $value->resolve();
             }
 
             if ($value instanceof Arrayable) {

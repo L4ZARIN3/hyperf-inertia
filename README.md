@@ -1,128 +1,193 @@
 # Inertia.js Hyperf Adapter
 
----
+The Hyperf adapter for [Inertia.js](https://inertiajs.com/), letting you build
+single-page applications using classic server-side routing and controllers.
 
-Visit [inertiajs.com](https://inertiajs.com/) to learn more.
+> ⚡ **Começando agora?** [QUICKSTART.md](QUICKSTART.md) — da instalação à
+> primeira página em 10 passos rápidos.
+>
+> 📖 **Documentação completa (instalação, render, shared/lazy props, validação,
+> redirects, Vite, SSR, testes e referência):** [DOCUMENTACAO.md](DOCUMENTACAO.md)
 
+## Requirements
 
-# Todo
-
-- [ ] Programmatically initialize node_modules.
-
+- PHP `>= 8.2`
+- [Hyperf](https://hyperf.io) `3.2`
+- Node.js `>= 18` and npm (for the front-end tooling)
 
 ## Installation
 
-- ``` composer require onix-systems-php/hyperf-inertia ```  require package.
-- ``` php ./bin/hyperf.php vendor:publish  onix-systems-php/hyperf-inertia``` publish config and middleware from package.
-- `npm init` init package.json if not exist
-- ```php ./bin/hyperf.php inertia:init ``` Initialize inertia.
-- Add commands to the package.json
-    ```json
-    "scripts": {
-      "dev": "vite",
-      "build": "vite build",
-      "build-ssr": "vite build && vite build --ssr" (optional)
-    },
+1. Require the package:
+
+    ```bash
+    composer require onix-systems-php/hyperf-inertia
     ```
-- ``` npm i ``` install node_modules  packages  
-- Run inertia:
-  - ``` npm run dev ``` for development
-  - ``` npm run build ``` for production
-> **Note**
-> If you use Svelte, package.json type must be module.
-```"type": "module"```
+
+2. Publish the config and the middleware:
+
+    ```bash
+    php ./bin/hyperf.php vendor:publish onix-systems-php/hyperf-inertia
+    ```
+
+3. Initialize the front-end part (creates `package.json` entries and scaffolds
+   the `storage/inertia` + `storage/view/layouts` structure):
+
+    ```bash
+    php ./bin/hyperf.php inertia:init
+    ```
+
+4. Add the dev/build scripts to your `package.json`:
+
+    ```json
+    {
+      "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "build-ssr": "vite build && vite build --ssr"
+      }
+    }
+    ```
+
+5. Install the Node dependencies and start Vite:
+
+    ```bash
+    npm install
+    npm run dev        # development
+    npm run build      # production
+    ```
+
+> **Note** If you use Svelte, your `package.json` must declare
+> `"type": "module"`.
 
 ## Middleware
 
-Next we need to setup the Inertia middleware, in file `./config/middlewares.php` . You can accomplish this by publishing the HandleInertiaMiddleware middleware to your application.
-> **Note**
-    This middleware must be placed before the `validation` middleware.
-  ```php 
-  'http' => [
-        \App\Common\Middleware\HandleInertiaMiddleware::class,
-    ],
-  ```
+Register the published middleware in `./config/middlewares.php`. It must be
+placed **before** the `validation` middleware so that validation errors can be
+captured and shared as Inertia props.
+
+```php
+'http' => [
+    \App\Common\Middleware\HandleInertiaMiddleware::class,
+],
+```
+
+Customize the shared props (for example the authenticated user or flash
+messages) by overriding `share()` in the published middleware.
 
 ## Creating responses
 
 ```php
-    #[GetMapping(path: '/test-feedback')]
-    public function test(RequestInterface $request)
-    {
-        return inertia('Test', [
-            'title' => 'Feedback form',
-            'formTitle' => "What's on your mind?"
-        ])->toResponse($request);
-    }
+#[GetMapping(path: '/test-feedback')]
+public function test(RequestInterface $request)
+{
+    return inertia('Test', [
+        'title' => 'Feedback form',
+        'formTitle' => "What's on your mind?",
+    ])->toResponse($request);
+}
 ```
 
 ```php
-    #[PostMapping('/test-feedback')]
-    public function testFeedback(RequestInterface $request)
-    {
-        $rules = [
-            'fullname' => 'required|string|min:3|max:255',
-            'email' => 'required|email',
-            'message' => 'required|string|min:10|max:255',
-        ];
+#[PostMapping('/test-feedback')]
+public function testFeedback(RequestInterface $request)
+{
+    $validator = $this->validationFactory->make($request->all(), [
+        'fullname' => 'required|string|min:3|max:255',
+        'email' => 'required|email',
+        'message' => 'required|string|min:10|max:255',
+    ]);
+    $validator->validate();
 
-        $validator = $this->validationFactory->make($request->all(), $rules);
-        $validator->validate();
-
-        return redirect_with('test-feedback', [
-            'alert' => [
-                'message' => 'Feedback was successfully sent',
-                'type' => 'success',
-            ],
-        ]);
-    }
+    return redirect_with('test-feedback', [
+        'alert' => [
+            'message' => 'Feedback was successfully sent',
+            'type' => 'success',
+        ],
+    ]);
+}
 ```
 
-## Frontend Part
+### Shared, lazy and partial data
 
-After executing ``php ./bin/hyperf.php inertia:init`` you will get the
-folder structure.
+```php
+$inertia = inertia();
+
+// Share data with every response.
+$inertia->share('appName', 'My App');
+
+// Lazy props are only evaluated for partial reloads that request them.
+$inertia->render('Dashboard', [
+    'stats' => $inertia->lazy(fn () => $this->stats()),
+]);
+```
+
+## Frontend part
+
+After running `php ./bin/hyperf.php inertia:init` you get the following layout:
+
 ```
 .
 ├── storage
 │   ├── inertia
-│   │    ├── css
-│   │    │  └── app.css
-│   │    └── js
-│   │       ├── Components  
-│   │       ├── Layouts  
+│   │   ├── css
+│   │   │   └── app.css
+│   │   └── js
+│   │       ├── Components
+│   │       ├── Layouts
 │   │       ├── Pages
 │   │       ├── app.js
-│   │       ├── sst.js (optional)
+│   │       ├── ssr.js (optional)
 │   │       └── bootstrap.js
 │   ├── view
-│   │    └── layouts 
-│   │       └── app.blade.php
+│   │   └── layouts
+│   │       └── inertia.blade.php
 │   └── ...
-├── vite.config.json
-└── ... 
+├── vite.config.js
+└── ...
 ```
-In folders ```Components```, ```Layouts```, ```Pages``` you can create your own components, layouts and pages.
 
-### Ssr
-In the ```./bin/hyperf.php inertia:init``` process, you can select ssr.
-If you have set ssr separately, you can copy this file from ```hyperf-inertia/src/Commands/Stubs/{your_framework}/ssr.{ext}```
-Or read the [inertia](https://inertiajs.com/server-side-rendering) documentation .
+Create your own components, layouts and pages inside `Components`, `Layouts`
+and `Pages`.
 
-## How to run ssr
-- ``` npm run build-ssr ``` 
-- ``` php ./bin/hyperf.php inertia:start-ssr ``` into container run command to start ssr server.
+## Server-side rendering
+
+In the `inertia:init` process you can enable SSR. The `ssr` file is also
+available at `src/Commands/Stubs/{vue|react|svelte}/ssr.{js,jsx}`.
+
+- `npm run build-ssr`
+- `php ./bin/hyperf.php inertia:start-ssr` (run it inside your container / server)
+- `php ./bin/hyperf.php inertia:stop-ssr`
 
 ## Environment variables
-- ``` INERTIA_SSR_ENABLED ``` - If you are using ssr, set to true. By default false.
-- ``` INERTIA_SSR_URL ``` -  URL of the ssr server. By default http://127.0.0.1:13714.
-- ``` INERTIA_IS_SECURE ``` - If you are using http, set to false. By default true.
-- ``` INERTIA_SKIP_URL_PREFIX ``` - If you need to skip url, set to prefix. Prefixes should be specified as a string using the separator ``,``. By default empty string. Example ``` v1,api ```. All requests starting with this prefix will be skipped in inertia.
-- ``` INERTIA_NO_SKIP_EXTRA_PATH ``` When prefix exist in to ``` INERTIA_SKIP_URL_PREFIX ```, but an exception must be made for a separate path. The extra path should be specified as a string using the separator ``,``. By default empty string. Example ``` admin/login,admin/forgot ```.
 
-## Examples of frontend files
-In the package you can find example files for the frontend. vendor/onix-systems-php/hyperf-inertia/example There is also an example controller here.
-- It is necessary to connect styles in inertia.blade.php ```<link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">```
+| Variable                   | Default                     | Description |
+| -------------------------- | --------------------------- | ----------- |
+| `INERTIA_SSR_ENABLED`      | `false`                     | Enable server-side rendering. |
+| `INERTIA_SSR_URL`          | `http://127.0.0.1:13714`    | URL of the SSR server. |
+| `INERTIA_IS_SECURE`        | `true`                      | Set to `false` when serving over HTTP. |
+| `INERTIA_SKIP_URL_PREFIX`  | (empty)                     | Comma-separated URL prefixes skipped by Inertia (e.g. `v1,api`). |
+| `INERTIA_NO_SKIP_EXTRA_PATH` | (empty)                   | Comma-separated paths that are still handled even when their prefix is skipped (e.g. `admin/login`). |
 
-> **Note**
-> If you are using arm64, you need to add ``@rollup/rollup-darwin-arm64``, this is only for svelte
+## Testing
+
+The package ships with Inertia assertions for Hyperf tests:
+
+```php
+$this->get('/test-feedback')
+    ->assertInertia(fn (AssertableInertia $page) => $page
+        ->component('Test')
+        ->has('title')
+        ->where('title', 'Feedback form'));
+```
+
+## Development
+
+```bash
+composer test       # run the test suite
+composer analyse    # run PHPStan
+composer cs-fix     # fix code style
+```
+
+## License
+
+MIT. See [LICENSE](LICENSE).

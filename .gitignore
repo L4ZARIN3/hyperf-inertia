@@ -1,5 +1,7 @@
 /.idea
+/.vscode
 /vendor/
 composer.lock
+.phpunit.cache
 *.cache
 *.log

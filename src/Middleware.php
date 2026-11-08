@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace OnixSystemsPHP\HyperfInertia;
 
+use Hyperf\Context\ApplicationContext;
 use Hyperf\Context\Context;
 use Hyperf\Stringable\Str;
 use Hyperf\ViewEngine\Http\Middleware\ValidationExceptionHandle as BaseValidationExceptionHandler;
@@ -35,6 +36,7 @@ class Middleware extends BaseValidationExceptionHandler
         }
 
         $inertia = new Inertia();
+        $inertia->setRootView($this->rootView());
         $inertia->version(fn () => $this->version($request));
         $inertia->share($this->share($request));
         Context::set(Inertia::class, $inertia);
@@ -77,7 +79,8 @@ class Middleware extends BaseValidationExceptionHandler
 
         $manifestPaths = [
             '/mix-manifest.json',
-            '/build/manifest.json'
+            '/build/manifest.json',
+            '/build/.vite/manifest.json',
         ];
 
         foreach ($manifestPaths as $manifestPath) {
@@ -120,7 +123,9 @@ class Middleware extends BaseValidationExceptionHandler
      */
     public function onEmptyResponse(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        return $response->redirect($request->getUri()->getPath());
+        return ApplicationContext::getContainer()
+            ->get(\Hyperf\HttpServer\Contract\ResponseInterface::class)
+            ->redirect($request->getUri()->getPath());
     }
 
     /**
@@ -163,17 +168,17 @@ class Middleware extends BaseValidationExceptionHandler
     private function isSkipped(string $path): bool
     {
         $path = trim($path, '/');
-        $found = array_reduce(config('inertia.no_skip_extra_path'), function ($carry, $item) use ($path) {
-            return $carry || Str::startsWith($item, $path);
-        }, false);
 
-        if ($found) {
-            return false;
+        // Allow an exception for a specific path even when its prefix is skipped.
+        foreach (config('inertia.no_skip_extra_path', []) as $extraPath) {
+            if ($extraPath !== '' && Str::startsWith($path, $extraPath)) {
+                return false;
+            }
         }
 
         $segments = explode('/', $path);
         $prefix = array_shift($segments) ?? null;
 
-        return $prefix && in_array($prefix, config('inertia.skip_url_prefix'));
+        return $prefix !== null && in_array($prefix, config('inertia.skip_url_prefix', []), true);
     }
 }

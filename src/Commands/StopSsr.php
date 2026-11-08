@@ -9,8 +9,11 @@ declare(strict_types=1);
 
 namespace OnixSystemsPHP\HyperfInertia\Commands;
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use Hyperf\Command\Annotation\Command;
 use Hyperf\Command\Command as HyperfCommand;
+use Hyperf\Context\ApplicationContext;
 
 use function Hyperf\Config\config;
 
@@ -28,18 +31,18 @@ class StopSsr extends HyperfCommand
     {
         $url = str_replace('/render', '', config('inertia.ssr.url', 'http://127.0.0.1:13714')) . '/shutdown';
 
-        $ch = curl_init($url);
-        curl_exec($ch);
+        try {
+            ApplicationContext::getContainer()->get(Client::class)->request('GET', $url);
+        } catch (GuzzleException $e) {
+            // The SSR server closes the connection as soon as it receives the
+            // shutdown request, which Guzzle reports as a connection error.
+            // Any error means the server is either already stopped or unreachable.
+            $this->info('Inertia SSR server is not running or is already stopped.');
 
-        if (curl_error($ch) !== 'Empty reply from server') {
-            $this->error('Unable to connect to Inertia SSR server.');
-
-            return self::FAILURE;
+            return self::SUCCESS;
         }
 
         $this->info('Inertia SSR server stopped.');
-
-        curl_close($ch);
 
         return self::SUCCESS;
     }

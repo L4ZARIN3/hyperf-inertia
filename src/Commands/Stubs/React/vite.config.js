@@ -10,12 +10,11 @@ export default defineConfig(({ command }) => {
       react(),
       laravel({
         publicDirectory: 'storage/public',
-        input: ['storage/inertia/css/app.css', 'storage/inertia/js/app.js'],
-        ssr: 'storage/inertia/js/ssr.js',
+        input: ['storage/inertia/css/app.css', 'storage/inertia/js/app.jsx'],
+        ssr: 'storage/inertia/js/ssr.jsx',
         refresh: true,
 
       }),
     ],
   }
 });
-

@@ -4,7 +4,7 @@ import '../css/app.css';
 import {createInertiaApp} from '@inertiajs/svelte';
 import {resolvePageComponent} from 'laravel-vite-plugin/inertia-helpers';
 
-const appName = window.document.getElementsByTagName('title')[0]?.innerText || 'Laravel';
+const appName = window.document.getElementsByTagName('title')[0]?.innerText || 'Hyperf';
 
 createInertiaApp({
   title: (title) => `${title} - ${appName}`,

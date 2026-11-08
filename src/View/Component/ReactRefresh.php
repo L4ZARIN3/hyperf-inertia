@@ -15,6 +15,6 @@ class ReactRefresh extends Component
 {
     public function render(): mixed
     {
-        return '<?php echo \\Hyperf\\Support\\make(\\OnixSystemsPHP\\HyperfInertia\\Vite::class)->reactRefresh() ?>';
+        return '<?php echo \Hyperf\Support\make(\OnixSystemsPHP\HyperfInertia\Vite::class)->reactRefresh() ?>';
     }
 }

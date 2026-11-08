@@ -12,14 +12,17 @@ namespace OnixSystemsPHP\HyperfInertia;
 use OnixSystemsPHP\HyperfInertia\Commands\InertiaInitCommand;
 use OnixSystemsPHP\HyperfInertia\Commands\StartSsr;
 use OnixSystemsPHP\HyperfInertia\Commands\StopSsr;
+use OnixSystemsPHP\HyperfInertia\Listener\RegisterTestingMacrosListener;
+use OnixSystemsPHP\HyperfInertia\View\Component\InertiaBody;
+use OnixSystemsPHP\HyperfInertia\View\Component\InertiaHead;
+use OnixSystemsPHP\HyperfInertia\View\Component\ReactRefresh;
 
 class ConfigProvider
 {
     public function __invoke(): array
     {
         return [
-            'dependencies' => [
-            ],
+            'dependencies' => [],
             'commands' => [
                 StartSsr::class,
                 StopSsr::class,
@@ -33,6 +36,7 @@ class ConfigProvider
                 ],
             ],
             'listeners' => [
+                RegisterTestingMacrosListener::class,
             ],
 
             'publish' => [
@@ -52,9 +56,9 @@ class ConfigProvider
 
             'view' => [
                 'components' => [
-                    'inertia-body' => \OnixSystemsPHP\HyperfInertia\View\Component\InertiaBody::class,
-                    'inertia-head' => \OnixSystemsPHP\HyperfInertia\View\Component\InertiaHead::class,
-                    'react-refresh' => \OnixSystemsPHP\HyperfInertia\View\Component\ReactRefresh::class,
+                    'inertia-body' => InertiaBody::class,
+                    'inertia-head' => InertiaHead::class,
+                    'react-refresh' => ReactRefresh::class,
                 ],
             ],
         ];

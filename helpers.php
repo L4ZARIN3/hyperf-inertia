@@ -13,6 +13,8 @@ use Hyperf\Contract\SessionInterface;
 use Hyperf\HttpServer\Contract\RequestInterface;
 use Hyperf\HttpServer\Contract\ResponseInterface;
 use OnixSystemsPHP\HyperfInertia\Inertia;
+use OnixSystemsPHP\HyperfInertia\InertiaResponse;
+use Psr\Http\Message\ResponseInterface as PsrResponseInterface;
 
 use function Hyperf\Collection\collect;
 
@@ -23,7 +25,7 @@ if (! function_exists('inertia')) {
      * @param null|string $component
      * @param array|Arrayable $props
      */
-    function inertia($component = null, $props = [])
+    function inertia($component = null, $props = []): Inertia|InertiaResponse
     {
         /** @var Inertia $inertia */
         $inertia = Context::get(Inertia::class, new Inertia());
@@ -37,7 +39,7 @@ if (! function_exists('inertia')) {
 }
 
 if (! function_exists('redirect_with')) {
-    function redirect_with($path = '/', $data = [])
+    function redirect_with($path = '/', $data = []): PsrResponseInterface
     {
         $request = ApplicationContext::getContainer()->get(RequestInterface::class);
         $response = ApplicationContext::getContainer()->get(ResponseInterface::class);
@@ -47,16 +49,18 @@ if (! function_exists('redirect_with')) {
         return $response->redirect(toUrl: $path, schema: $request->getUri()->getScheme());
     }
 }
+
 if (! function_exists('inertia_location')) {
     /**
      * Inertia location helper.
      *
      * @param string $url
      */
-    function inertia_location($url)
+    function inertia_location($url): PsrResponseInterface
     {
         /** @var Inertia $inertia */
         $inertia = Context::get(Inertia::class, new Inertia());
+
         return $inertia->location($url);
     }
 }

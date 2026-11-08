@@ -25,7 +25,8 @@ class HttpGateway implements Gateway
             return null;
         }
 
-        $url = str_replace('/render', '', config('inertia.ssr.url', 'http://127.0.0.1:13714')) . '/render';
+        $url = rtrim((string) config('inertia.ssr.url', 'http://127.0.0.1:13714'), '/');
+        $url = str_ends_with($url, '/render') ? $url : $url . '/render';
 
         try {
             $client = ApplicationContext::getContainer()->get(Client::class);
@@ -36,11 +37,11 @@ class HttpGateway implements Gateway
                 512,
                 JSON_THROW_ON_ERROR
             );
-        } catch (\Exception $e) {
+        } catch (\Throwable) {
             return null;
         }
 
-        if (is_null($response)) {
+        if (! is_array($response) || ! isset($response['head'], $response['body'])) {
             return null;
         }
 

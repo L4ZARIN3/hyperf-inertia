@@ -129,19 +129,19 @@ class Vite implements Htmlable
                 ]);
 
                 foreach ($manifest[$import]['css'] ?? [] as $css) {
-                    $partialManifest = collect($manifest)->where('file', $css);
+                    [$cssSrc, $cssChunk] = $this->findCssChunk($manifest, $css);
 
                     $preloads->push([
-                        $partialManifest->keys()->first(),
+                        $cssSrc,
                         $this->assetPath("{$buildDirectory}/{$css}"),
-                        $partialManifest->first(),
+                        $cssChunk,
                         $manifest,
                     ]);
 
                     $tags->push($this->makeTagForChunk(
-                        $partialManifest->keys()->first(),
+                        $cssSrc,
                         $this->assetPath("{$buildDirectory}/{$css}"),
-                        $partialManifest->first(),
+                        $cssChunk,
                         $manifest
                     ));
                 }
@@ -155,19 +155,19 @@ class Vite implements Htmlable
             ));
 
             foreach ($chunk['css'] ?? [] as $css) {
-                $partialManifest = collect($manifest)->where('file', $css);
+                [$cssSrc, $cssChunk] = $this->findCssChunk($manifest, $css);
 
                 $preloads->push([
-                    $partialManifest->keys()->first(),
+                    $cssSrc,
                     $this->assetPath("{$buildDirectory}/{$css}"),
-                    $partialManifest->first(),
+                    $cssChunk,
                     $manifest,
                 ]);
 
                 $tags->push($this->makeTagForChunk(
-                    $partialManifest->keys()->first(),
+                    $cssSrc,
                     $this->assetPath("{$buildDirectory}/{$css}"),
-                    $partialManifest->first(),
+                    $cssChunk,
                     $manifest
                 ));
             }
@@ -366,13 +366,19 @@ class Vite implements Htmlable
     {
         $buildDirectory ??= $this->buildDirectory;
         $chunk = $this->chunk($this->manifest($buildDirectory), $asset);
-        $path = self::getPublicPath($buildDirectory . '/' . $buildDirectory . '/' . $chunk['file']);
+        $path = self::getPublicPath($buildDirectory . '/' . $chunk['file']);
 
         if (! is_file($path) || ! file_exists($path)) {
             throw new \Exception("Unable to locate file from Vite manifest: {$path}.");
         }
 
-        return file_get_contents($path);
+        $contents = file_get_contents($path);
+
+        if ($contents === false) {
+            throw new \Exception("Unable to read file from Vite manifest: {$path}.");
+        }
+
+        return $contents;
     }
 
     /**
@@ -397,8 +403,8 @@ class Vite implements Htmlable
     {
         return config('inertia.public_path_prefix') . (
             $path != ''
-                ? DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR) :
-                ''
+                ? DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR)
+                : ''
         );
     }
 
@@ -605,7 +611,13 @@ class Vite implements Htmlable
      */
     protected function hotAsset($asset): string
     {
-        return rtrim(file_get_contents($this->hotFile())) . '/' . $asset;
+        $hot = file_get_contents($this->hotFile());
+
+        if ($hot === false) {
+            throw new \RuntimeException("Unable to read Vite hot file at: {$this->hotFile()}");
+        }
+
+        return rtrim($hot) . '/' . $asset;
     }
 
     /**
@@ -619,29 +631,64 @@ class Vite implements Htmlable
     /**
      * Get the the manifest file for the given build directory.
      *
+     * The manifest is cached per process, but the cache key includes the file
+     * modification time so that a new `vite build` is picked up without having
+     * to restart the server.
+     *
      * @throws ViteManifestNotFoundException
      */
     protected function manifest(string $buildDirectory): array
     {
         $path = $this->manifestPath($buildDirectory);
 
-        if (! isset(static::$manifests[$path])) {
-            if (! is_file($path)) {
-                throw new ViteManifestNotFoundException("Vite manifest not found at: {$path}");
-            }
-
-            static::$manifests[$path] = json_decode(file_get_contents($path), true);
+        if (! is_file($path)) {
+            throw new ViteManifestNotFoundException("Vite manifest not found at: {$path}");
         }
 
-        return static::$manifests[$path];
+        $mtime = filemtime($path);
+        $key = $path . '@' . ($mtime === false ? '0' : (string) $mtime);
+
+        if (! isset(static::$manifests[$key])) {
+            $manifest = file_get_contents($path);
+
+            if ($manifest === false) {
+                throw new ViteManifestNotFoundException("Unable to read Vite manifest at: {$path}");
+            }
+
+            $decoded = json_decode($manifest, true);
+
+            if (! is_array($decoded)) {
+                throw new ViteManifestNotFoundException("Unable to decode Vite manifest at: {$path}");
+            }
+
+            static::$manifests[$key] = $decoded;
+        }
+
+        return static::$manifests[$key];
     }
 
     /**
      * Get the path to the manifest file for the given build directory.
+     *
+     * Vite 6 writes the manifest to `build/.vite/manifest.json` by default,
+     * while earlier versions and the Laravel plugin use `build/manifest.json`.
+     * We look in both locations.
      */
     protected function manifestPath(string $buildDirectory): string
     {
-        return self::getPublicPath($buildDirectory . '/' . $this->manifestFilename);
+        $candidates = [
+            $buildDirectory . '/' . $this->manifestFilename,
+            $buildDirectory . '/.vite/' . $this->manifestFilename,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $path = self::getPublicPath($candidate);
+            if (is_file($path)) {
+                return $path;
+            }
+        }
+
+        return self::getPublicPath($candidates[0]);
     }
 
     /**
@@ -656,5 +703,25 @@ class Vite implements Htmlable
         }
 
         return $manifest[$file];
+    }
+
+    /**
+     * Locate the manifest entry for a CSS asset.
+     *
+     * Vite 6 lists CSS files on a chunk's `css` array without necessarily
+     * exposing a standalone manifest entry for them, so we tolerate a missing
+     * entry by returning an empty chunk.
+     *
+     * @return array{0: string, 1: array}
+     */
+    protected function findCssChunk(array $manifest, string $css): array
+    {
+        foreach ($manifest as $src => $chunk) {
+            if (($chunk['file'] ?? null) === $css) {
+                return [(string) $src, $chunk];
+            }
+        }
+
+        return [$css, []];
     }
 }

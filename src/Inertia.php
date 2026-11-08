@@ -17,6 +17,7 @@ use Hyperf\HttpMessage\Uri\Uri;
 use Hyperf\HttpServer\Contract\RequestInterface;
 use Hyperf\HttpServer\Contract\ResponseInterface;
 use Hyperf\Macroable\Macroable;
+use Psr\Http\Message\ResponseInterface as PsrResponseInterface;
 
 use function Hyperf\Config\config;
 use function Hyperf\Support\call;
@@ -27,21 +28,24 @@ class Inertia
 
     protected string $rootView = 'app';
 
+    /** @var array<string, mixed> */
     protected array $sharedProps = [];
 
-    protected null|\Closure|string $version = null;
+    protected \Closure|string|null $version = null;
 
     public function __construct()
     {
-        $this->rootView = config('inertia.root_view', $this->rootView);
+        $this->rootView = (string) config('inertia.root_view', $this->rootView);
     }
 
-    public function setRootView(string $name): void
+    public function setRootView(string $name): static
     {
         $this->rootView = $name;
+
+        return $this;
     }
 
-    public function share(array|Arrayable|string $key, mixed $value = null): void
+    public function share(array|Arrayable|string $key, mixed $value = null): static
     {
         if (is_array($key)) {
             $this->sharedProps = array_merge($this->sharedProps, $key);
@@ -50,25 +54,31 @@ class Inertia
         } else {
             Arr::set($this->sharedProps, $key, $value);
         }
+
+        return $this;
     }
 
     public function getShared(?string $key = null, mixed $default = null): mixed
     {
-        if ($key) {
+        if ($key !== null) {
             return Arr::get($this->sharedProps, $key, $default);
         }
 
         return $this->sharedProps;
     }
 
-    public function flushShared(): void
+    public function flushShared(): static
     {
         $this->sharedProps = [];
+
+        return $this;
     }
 
-    public function version(null|\Closure|string $version): void
+    public function version(\Closure|string|null $version): static
     {
         $this->version = $version;
+
+        return $this;
     }
 
     public function getVersion(): string
@@ -99,19 +109,21 @@ class Inertia
         );
     }
 
-    public function location(string|Uri $url): ResponseInterface
+    public function location(string|Uri $url): PsrResponseInterface
     {
         $response = ApplicationContext::getContainer()->get(ResponseInterface::class);
         $request = ApplicationContext::getContainer()->get(RequestInterface::class);
+        $url = $url instanceof Uri ? $url->toString() : $url;
+
         if ($request->hasHeader('X-Inertia')) {
             return $response
                 ->withStatus(409)
-                ->withAddedHeader('X-Inertia-Location', $url instanceof Uri ? $url->toString() : $url)
+                ->withAddedHeader('X-Inertia-Location', $url)
                 ->withBody(new SwooleStream(''));
         }
 
         return $response->redirect(
-            toUrl:$url instanceof Uri ? $url->toString() : $url,
+            toUrl: $url,
             schema: $request->getUri()->getScheme()
         );
     }

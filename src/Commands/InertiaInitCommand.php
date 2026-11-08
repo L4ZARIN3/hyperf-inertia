@@ -23,38 +23,36 @@ class InertiaInitCommand extends HyperfCommand
 
     protected array $nodePackages = [
         'core' => [
-            'autoprefixer' => '*',
+            'autoprefixer' => '^10.4',
         ],
         'vue' => [
             'default' => [
-                'vue' => '^3.*',
-                '@inertiajs/vue3' => '^1.*',
-                '@vitejs/plugin-vue' => '^4.*',
-                '@vue/compiler-sfc' => '^3.*',
-                'vite' => '^4.*',
-                'laravel-vite-plugin' => '^0.*',
+                'vue' => '^3.5',
+                '@inertiajs/vue3' => '^2.0',
+                '@vitejs/plugin-vue' => '^5.2',
+                'vite' => '^6.0',
+                'laravel-vite-plugin' => '^1.2',
             ],
-            'ssr' => ['@vue/server-renderer' => '^3.*'],
+            'ssr' => ['@vue/server-renderer' => '^3.5'],
         ],
         'react' => [
             'default' => [
-                '@inertiajs/inertia-react' => '^0.*',
-                '@inertiajs/react' => '^1.*',
-                '@vitejs/plugin-react' => '^4.*',
-                'react' => '^18.*',
-                'react-dom' => '^18.*',
-                'vite' => '^4.*',
-                'laravel-vite-plugin' => '^0.*',
+                '@inertiajs/react' => '^2.0',
+                '@vitejs/plugin-react' => '^4.4',
+                'react' => '^18.3',
+                'react-dom' => '^18.3',
+                'vite' => '^6.0',
+                'laravel-vite-plugin' => '^1.2',
             ],
             'ssr' => [],
         ],
         'svelte' => [
             'default' => [
-                'svelte' => '^4.*',
-                '@inertiajs/svelte' => '^1.*',
-                '@sveltejs/vite-plugin-svelte' => '^3.*',
-                '@vue/compiler-sfc' => '^3.*',
-                'laravel-vite-plugin' => '^1.0.2',
+                'svelte' => '^5.0',
+                '@inertiajs/svelte' => '^2.0',
+                '@sveltejs/vite-plugin-svelte' => '^5.0',
+                'vite' => '^6.0',
+                'laravel-vite-plugin' => '^1.2',
             ],
             'ssr' => [],
         ],
@@ -120,7 +118,7 @@ class InertiaInitCommand extends HyperfCommand
 
     private function makeStructure(): void
     {
-        if(!$this->filesystem->exists(self::getInertiaPath())) {
+        if (! $this->filesystem->exists(self::getInertiaPath())) {
             $this->filesystem->makeDirectory(path: self::getInertiaPath(), recursive: true);
         }
 

@@ -13,7 +13,6 @@ use Hyperf\Testing\Fluent\AssertableJson;
 use Hyperf\Testing\Http\TestResponse;
 use Hyperf\ViewEngine\Finder;
 use PHPUnit\Framework\Assert as PHPUnit;
-use PHPUnit\Framework\AssertionFailedError;
 
 use function Hyperf\Config\config;
 use function Hyperf\Support\make;
@@ -28,18 +27,7 @@ class AssertableInertia extends AssertableJson
 
     public static function fromTestResponse(TestResponse $response): self
     {
-        try {
-            $response->assertViewHas('page');
-            $page = json_decode(json_encode($response->viewData('page')), true);
-
-            PHPUnit::assertIsArray($page);
-            PHPUnit::assertArrayHasKey('component', $page);
-            PHPUnit::assertArrayHasKey('props', $page);
-            PHPUnit::assertArrayHasKey('url', $page);
-            PHPUnit::assertArrayHasKey('version', $page);
-        } catch (AssertionFailedError $e) {
-            PHPUnit::fail('Not a valid Inertia response.');
-        }
+        $page = self::extractPage($response);
 
         $instance = static::fromArray($page['props']);
         $instance->component = $page['component'];
@@ -87,5 +75,33 @@ class AssertableInertia extends AssertableJson
             'url' => $this->url,
             'version' => $this->version,
         ];
+    }
+
+    /**
+     * Extract the Inertia page from a Hyperf test response.
+     *
+     * An Inertia response is either a JSON payload (for requests carrying the
+     * `X-Inertia` header) or an HTML document embedding the page in the
+     * `data-page` attribute of the root element (first visits).
+     *
+     * @return array{component:string, props:array, url:string, version:?string}
+     */
+    private static function extractPage(TestResponse $response): array
+    {
+        $content = $response->getContent();
+
+        $decoded = json_decode($content, true);
+        if (is_array($decoded) && isset($decoded['component'], $decoded['props'])) {
+            return $decoded;
+        }
+
+        if (preg_match('/data-page="([^"]*)"/', $content, $matches) === 1) {
+            $decoded = json_decode(html_entity_decode($matches[1], ENT_QUOTES), true);
+            if (is_array($decoded) && isset($decoded['component'], $decoded['props'])) {
+                return $decoded;
+            }
+        }
+
+        PHPUnit::fail('Not a valid Inertia response.');
     }
 }

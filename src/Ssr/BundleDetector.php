@@ -14,7 +14,7 @@ use function Hyperf\Config\config;
 
 class BundleDetector
 {
-    public function detect()
+    public function detect(): ?string
     {
         return collect([
             config('inertia.ssr.bundle'),
