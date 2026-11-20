@@ -38,7 +38,7 @@ return [
     |
     */
     'public_path_prefix' => __DIR__ . '/../../storage/public',
-    'asset_public_path' => env('DOMAIN_API', '') . '/public',
+    'asset_public_path' => env('DOMAIN_API', ''),
 
     /*
     |--------------------------------------------------------------------------
