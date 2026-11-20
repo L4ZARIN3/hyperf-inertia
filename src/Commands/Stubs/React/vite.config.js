@@ -37,7 +37,7 @@ function hyperfHotFile() {
 export default defineConfig(({ command }) => {
   const isBuild = command === 'build';
   return {
-    base: isBuild ? '/public/build/' : '/',
+    base: isBuild ? '/build/' : '/',
     plugins: [
       react(),
       hyperfHotFile(),
