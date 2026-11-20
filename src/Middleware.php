@@ -1,0 +1,184 @@
+<?php
+
+declare(strict_types=1);
+/**
+ * This file is part of the Inertia library for Hyperf.
+ *
+ * @license  https://github.com/onix-systems-php/hyperf-inertia/blob/main/LICENSE
+ */
+
+namespace OnixSystemsPHP\HyperfInertia;
+
+use Hyperf\Context\ApplicationContext;
+use Hyperf\Context\Context;
+use Hyperf\Stringable\Str;
+use Hyperf\ViewEngine\Http\Middleware\ValidationExceptionHandle as BaseValidationExceptionHandler;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\RequestHandlerInterface;
+
+use function Hyperf\Collection\collect;
+use function Hyperf\Config\config;
+
+class Middleware extends BaseValidationExceptionHandler
+{
+    protected string $rootView = 'app';
+
+    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+    {
+        $request->getUri()->setScheme(config('inertia.is_secure') ? 'https' : 'http');
+
+        $this->session->setPreviousUrl($request->url());
+
+        $path = $request->getUri()->getPath();
+        if ($this->isSkipped($path)) {
+            return $handler->handle($request);
+        }
+
+        $inertia = new Inertia();
+        $inertia->setRootView($this->rootView());
+        $inertia->version(fn () => $this->version($request));
+        $inertia->share($this->share($request));
+        Context::set(Inertia::class, $inertia);
+
+        $response = parent::process($request, $handler);
+
+        $response->setHeader('Vary', 'X-Inertia');
+
+        if (! $request->hasHeader('X-Inertia')) {
+            return $response;
+        }
+
+        if ($request->getMethod() === 'GET'
+            && $request->getHeaderLine('X-Inertia-Version', '') !== $inertia->getVersion()
+        ) {
+            $response = $this->onVersionChange($request, $response);
+        }
+
+        if ($response->getStatusCode() === 200 && empty($response->getBody())) {
+            $response = $this->onEmptyResponse($request, $response);
+        }
+
+        if ($response->getStatusCode() === 302 && in_array($request->getMethod(), ['POST', 'PUT', 'PATCH', 'DELETE'])) {
+            $response = $response->withStatus(303);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Determines the current asset version.
+     *
+     * @see https://inertiajs.com/asset-versioning
+     */
+    public function version(ServerRequestInterface $request): ?string
+    {
+        if (config('app.asset_url')) {
+            return md5(config('app.asset_url'));
+        }
+
+        $manifestPaths = [
+            '/mix-manifest.json',
+            '/build/manifest.json',
+            '/build/.vite/manifest.json',
+        ];
+
+        foreach ($manifestPaths as $manifestPath) {
+            $manifest = Vite::getPublicPath($manifestPath);
+            if (file_exists($manifest)) {
+                return md5_file($manifest);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Defines the props that are shared by default.
+     *
+     * @see https://inertiajs.com/shared-data
+     */
+    public function share(ServerRequestInterface $request): array
+    {
+        return [
+            'errors' => function () use ($request) {
+                return $this->resolveValidationErrors($request);
+            },
+        ];
+    }
+
+    /**
+     * Sets the root template that's loaded on the first page visit.
+     *
+     * @see https://inertiajs.com/server-side-setup#root-template
+     */
+    public function rootView(): string
+    {
+        return config('inertia.root_view', $this->rootView);
+    }
+
+    /**
+     * Determines what to do when an Inertia action returned with no response.
+     * By default, we'll redirect the user back to where they came from.
+     */
+    public function onEmptyResponse(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        return ApplicationContext::getContainer()
+            ->get(\Hyperf\HttpServer\Contract\ResponseInterface::class)
+            ->redirect($request->getUri()->getPath());
+    }
+
+    /**
+     * Determines what to do when the Inertia asset version has changed.
+     * By default, we'll initiate a client-side location visit to force an update.
+     */
+    public function onVersionChange(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $inertia = Context::get(Inertia::class);
+        return $inertia->location($request->getUri());
+    }
+
+    /**
+     * Resolves and prepares validation errors in such
+     * a way that they are easier to use client-side.
+     */
+    public function resolveValidationErrors(ServerRequestInterface $request): object
+    {
+        if (! $this->session->has('errors')) {
+            return (object) [];
+        }
+
+        return (object) collect($this->session->get('errors')->getBags())->map(function ($bag) {
+            return (object) collect($bag->messages())->map(function ($errors) {
+                return $errors[0];
+            })->toArray();
+        })->pipe(function ($bags) use ($request) {
+            if ($bags->has('default') && $request->hasHeader('x-inertia-error-bag')) {
+                return [$request->getHeaderLine('x-inertia-error-bag') => $bags->get('default')];
+            }
+
+            if ($bags->has('default')) {
+                return $bags->get('default');
+            }
+
+            return $bags->toArray();
+        });
+    }
+
+    private function isSkipped(string $path): bool
+    {
+        $path = trim($path, '/');
+
+        // Allow an exception for a specific path even when its prefix is skipped.
+        foreach (config('inertia.no_skip_extra_path', []) as $extraPath) {
+            if ($extraPath !== '' && Str::startsWith($path, $extraPath)) {
+                return false;
+            }
+        }
+
+        $segments = explode('/', $path);
+        $prefix = array_shift($segments) ?? null;
+
+        return $prefix !== null && in_array($prefix, config('inertia.skip_url_prefix', []), true);
+    }
+}
